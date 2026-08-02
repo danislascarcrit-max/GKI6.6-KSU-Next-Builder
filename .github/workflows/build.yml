@@ -21,11 +21,19 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y git ccache bison flex libssl-dev libelf-dev bc python3 python-is-python3 libncurses-dev curl tar clang lld
 
-      - name: Setup Kernel Source & KSU-Next
+      - name: Clone GKI 6.6 Kernel
         run: |
           git clone --depth=1 https://android.googlesource.com/kernel/common -b android15-6.6 android-kernel
+
+      - name: Setup KernelSU-Next
+        run: |
           cd android-kernel
-          curl -LSs "https://raw.githubusercontent.com/rifs28/KernelSU-Next/next/kernel/setup.sh" | bash -s next
+          # Clone KernelSU-Next langsung ke drivers
+          git clone https://github.com/rifs28/KernelSU-Next.git drivers/kernelsu
+          
+          # Tambahkan entry drivers/kernelsu ke Makefile & Kconfig
+          echo 'obj-y += kernelsu/' >> drivers/Makefile
+          echo 'source "drivers/kernelsu/Kconfig"' >> drivers/Kconfig
 
       - name: Compile Kernel Image
         run: |
