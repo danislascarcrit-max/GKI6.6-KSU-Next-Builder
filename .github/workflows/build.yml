@@ -19,37 +19,35 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git ccache bison flex libssl-dev libelf-dev bc python3 python-is-python3 libncurses-dev curl tar clang lld llvm
+          sudo apt-get install -y git ccache bison flex libssl-dev libelf-dev bc python3 python-is-python3 libncurses-dev curl tar clang lld llvm pahole device-tree-compiler
 
-      - name: Download AOSP Kernel Source & Toolchain
+      - name: Download AOSP Kernel Source & Clang
         run: |
           git clone --depth=1 https://android.googlesource.com/kernel/common -b android15-6.6 kernel_workspace
           cd kernel_workspace
           
-          # Clone AOSP Clang resmi terbaru langsung dari repository prebuilts Google
-          git clone --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 prebuilts-master/clang/host/linux-x86
+          # Clone AOSP Clang
+          git clone --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 prebuilts/clang/host/linux-x86
 
       - name: Integrasi KernelSU-Next
         run: |
           cd kernel_workspace
-          
-          # Setup KernelSU-Next
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s next
 
       - name: Compile GKI Image
         run: |
           cd kernel_workspace
           
-          # Cari lokasi binary clang yang baru di-clone
-          CLANG_PATH=$(ls -d $(pwd)/prebuilts-master/clang/host/linux-x86/clang-r* | tail -n 1)/bin
-          export PATH=$CLANG_PATH:$PATH
+          # Path Clang
+          CLANG_DIR=$(pwd)/prebuilts/clang/host/linux-x86/clang-r*
+          export PATH=$CLANG_DIR/bin:$PATH
           
-          # Generate defconfig & enable KSU
+          # Configure GKI & KSU
           make ARCH=arm64 LLVM=1 LLVM_IAS=1 gki_defconfig
           scripts/config --enable CONFIG_KSU
           
           # Build Image
-          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 Image
+          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 CROSS_COMPILE=aarch64-linux-gnu- Image
 
       - name: Upload Kernel Result
         uses: actions/upload-artifact@v4
