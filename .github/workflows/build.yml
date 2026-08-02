@@ -16,23 +16,43 @@ jobs:
           root-reserve-mb: 8192
           temp-reserve-mb: 2048
 
-      - name: Build GKI Kernel via Auto-GKI Engine
-        uses: dabao1955/kernel_build_action@main
-        with:
-          kernel-url: https://android.googlesource.com/kernel/common
-          kernel-branch: android15-6.6
-          android-version: android15
-          aosp-clang: true
-          aosp-gcc: true
-          ksu: true
-          ksu-version: main
-          ksu-url: https://github.com/KernelSU-Next/KernelSU-Next.git
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git ccache bison flex libssl-dev libelf-dev bc python3 python-is-python3 libncurses-dev curl tar clang lld llvm
 
-      - name: Upload Kernel Artifact
+      - name: Download AOSP Kernel Source & Toolchain
+        run: |
+          git clone --depth=1 https://android.googlesource.com/kernel/common -b android15-6.6 kernel_workspace
+          cd kernel_workspace
+          
+          # Clone AOSP Clang resmi terbaru langsung dari repository prebuilts Google
+          git clone --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 prebuilts-master/clang/host/linux-x86
+
+      - name: Integrasi KernelSU-Next
+        run: |
+          cd kernel_workspace
+          
+          # Setup KernelSU-Next
+          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s next
+
+      - name: Compile GKI Image
+        run: |
+          cd kernel_workspace
+          
+          # Cari lokasi binary clang yang baru di-clone
+          CLANG_PATH=$(ls -d $(pwd)/prebuilts-master/clang/host/linux-x86/clang-r* | tail -n 1)/bin
+          export PATH=$CLANG_PATH:$PATH
+          
+          # Generate defconfig & enable KSU
+          make ARCH=arm64 LLVM=1 LLVM_IAS=1 gki_defconfig
+          scripts/config --enable CONFIG_KSU
+          
+          # Build Image
+          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 Image
+
+      - name: Upload Kernel Result
         uses: actions/upload-artifact@v4
         with:
-          name: GKI-6.6-KernelSU-Next
-          path: |
-            android-kernel/arch/arm64/boot/Image
-            boot.img
-            *.img
+          name: GKI-6.6-KSU-Next-BuiltIn
+          path: kernel_workspace/arch/arm64/boot/Image
