@@ -16,29 +16,40 @@ jobs:
           remove-android: 'true'
           remove-haskell: 'true'
 
-      - name: Setup Build Environment
+      - name: Setup Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git ccache bison flex libssl-dev libelf-dev bc
+          sudo apt-get install -y git ccache bison flex libssl-dev libelf-dev bc python3 python-is-python3 libncurses-dev wget curl tar
 
-      - name: Download & Setup Android GKI 6.6 Source
+      - name: Download Clang Toolchain & GKI Source
         run: |
-          mkdir gki && cd gki
-          git clone --depth=1 https://android.googlesource.com/kernel/common -b android15-6.6 android-gki
-          cd android-gki
+          mkdir build-dir && cd build-dir
           
-          # Integrate KernelSU-Next (Built-in)
+          # Download AOSP Clang
+          wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r510928.tar.gz
+          mkdir clang && tar -xf clang-r510928.tar.gz -C clang
+          
+          # Clone GKI 6.6 Kernel Source
+          git clone --depth=1 https://android.googlesource.com/kernel/common -b android15-6.6 android-kernel
+          cd android-kernel
+          
+          # Setup KernelSU-Next
           curl -LSs "https://raw.githubusercontent.com/rifs28/KernelSU-Next/next/kernel/setup.sh" | bash -s next
 
-      - name: Build GKI Kernel
+      - name: Compile Kernel Image
         run: |
-          cd gki/android-gki
-          make ARCH=arm64 LLVM=1 defconfig
+          cd build-dir/android-kernel
+          export PATH=$GITHUB_WORKSPACE/build-dir/clang/bin:$PATH
+          
+          make ARCH=arm64 LLVM=1 LLVM_IAS=1 gki_defconfig
+          
+          # Enable Built-in KSU
           echo "CONFIG_KSU=y" >> .config
-          make -j$(nproc) ARCH=arm64 LLVM=1 Image.gz
+          
+          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 Image.gz
 
-      - name: Upload Kernel Artifact
+      - name: Upload Kernel Result
         uses: actions/upload-artifact@v4
         with:
-          name: GKI-6.6-KSU-Next-BuiltIn
-          path: gki/android-gki/arch/arm64/boot/Image.gz
+          name: GKI-6.6-KSU-Next-Image
+          path: build-dir/android-kernel/arch/arm64/boot/Image.gz
