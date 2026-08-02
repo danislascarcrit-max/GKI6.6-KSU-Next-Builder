@@ -7,6 +7,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
       - name: Maximize Build Space
         uses: easimon/maximize-build-space@master
         with:
@@ -16,39 +19,35 @@ jobs:
           remove-android: 'true'
           remove-haskell: 'true'
 
-      - name: Setup Build Dependencies
+      - name: Setup Build Environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y git ccache bison flex libssl-dev libelf-dev bc python3 python-is-python3 libncurses-dev curl tar clang lld
+          sudo apt-get install -y git ccache bison flex libssl-dev libelf-dev bc python3 python-is-python3 libncurses-dev curl tar clang lld llvm
 
-      - name: Clone GKI 6.6 Kernel
+      - name: Clone GKI 6.6 & Setup KSU-Next
         run: |
+          # Clone AOSP Common Kernel GKI 6.6
           git clone --depth=1 https://android.googlesource.com/kernel/common -b android15-6.6 android-kernel
+          cd android-kernel
 
-      - name: Integrasi KernelSU-Next Presisi
+          # Integrasi KernelSU-Next resmi
+          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s next
+
+      - name: Compile GKI Image
         run: |
           cd android-kernel
           
-          # 1. Clone Official Repository KernelSU-Next
-          git clone --depth=1 https://github.com/KernelSU-Next/KernelSU-Next.git drivers/kernelsu
-          
-          # 2. Perbaiki Struktur Path (Symlink Kconfig dan Makefile ke Root Folder KSU)
-          ln -sf $(pwd)/drivers/kernelsu/kernel/Kconfig drivers/kernelsu/Kconfig
-          ln -sf $(pwd)/drivers/kernelsu/kernel/Makefile drivers/kernelsu/Makefile
-          
-          # 3. Patch drivers/Kconfig dan drivers/Makefile utama
-          echo 'obj-y += kernelsu/' >> drivers/Makefile
-          echo 'source "drivers/kernelsu/Kconfig"' >> drivers/Kconfig
-
-      - name: Compile Kernel Image
-        run: |
-          cd android-kernel
+          # Konfigurasi GKI Defconfig
           make ARCH=arm64 LLVM=1 LLVM_IAS=1 gki_defconfig
-          echo "CONFIG_KSU=y" >> .config
-          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 Image.gz
+          
+          # Aktifkan KSU Built-in
+          scripts/config --enable CONFIG_KSU
+          
+          # Build Image Kernel
+          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 Image
 
-      - name: Upload Kernel Result
+      - name: Upload Kernel Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: GKI-6.6-KSU-Next-Image
-          path: android-kernel/arch/arm64/boot/Image.gz
+          name: GKI-6.6-KSU-Next-BuiltIn
+          path: android-kernel/arch/arm64/boot/Image
