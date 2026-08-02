@@ -28,10 +28,10 @@ jobs:
       - name: Setup KernelSU-Next
         run: |
           cd android-kernel
-          # Clone KernelSU-Next langsung ke drivers
-          git clone https://github.com/rifs28/KernelSU-Next.git drivers/kernelsu
+          # Use official public KernelSU-Next repository
+          git clone --depth=1 https://github.com/KernelSU-Next/KernelSU-Next.git drivers/kernelsu
           
-          # Tambahkan entry drivers/kernelsu ke Makefile & Kconfig
+          # Add KSU driver to Makefile & Kconfig
           echo 'obj-y += kernelsu/' >> drivers/Makefile
           echo 'source "drivers/kernelsu/Kconfig"' >> drivers/Kconfig
 
