@@ -28,12 +28,11 @@ jobs:
       - name: Setup KernelSU-Next
         run: |
           cd android-kernel
-          # Clone Official KernelSU-Next
+          # Clone KernelSU-Next
           git clone --depth=1 https://github.com/KernelSU-Next/KernelSU-Next.git drivers/kernelsu
           
-          # Jalankan setup script bawaan KSU-Next
-          cd drivers/kernelsu
-          bash setup.sh next
+          # Jalankan setup script resmi dari folder kernel/
+          bash drivers/kernelsu/kernel/setup.sh next
 
       - name: Compile Kernel Image
         run: |
